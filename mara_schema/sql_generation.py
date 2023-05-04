@@ -45,7 +45,7 @@ def data_set_sql_query(data_set: DataSet,
     Returns:
         A string containing the select statement
     """
-    engine = engine or sqlalchemy.create_engine(f'postgresql+psycopg2://')
+    engine = engine or sqlalchemy.create_engine('postgresql+psycopg2://')
 
     def quote(name) -> str:
         """Quote a column or table name for the specified database engine"""
@@ -78,12 +78,24 @@ def data_set_sql_query(data_set: DataSet,
 
         if star_schema and path:  # create a foreign key to the last entity of the path
             first = add_column_definition(
-                table_alias=table_alias_for_path(path[:-1]) if len(path) > 1 else entity_table_alias,
+                table_alias=table_alias_for_path(path[:-1])
+                if len(path) > 1
+                else entity_table_alias,
                 column_name=path[-1].fk_column,
-                column_alias=(normalize_name(' '.join([entity_link.prefix or entity_link.target_entity.name
-                                                       for entity_link in path]))
-                              if human_readable_columns else table_alias_for_path(path) + '_fk'),
-                cast_to_text=False, first=first)
+                column_alias=normalize_name(
+                    ' '.join(
+                        [
+                            entity_link.prefix
+                            or entity_link.target_entity.name
+                            for entity_link in path
+                        ]
+                    )
+                )
+                if human_readable_columns
+                else f'{table_alias_for_path(path)}_fk',
+                cast_to_text=False,
+                first=first,
+            )
 
         # Add columns for all attributes
         # Always add all columns for the first object (i.e. the original dataset) as indicated by path == ()
@@ -102,9 +114,17 @@ def data_set_sql_query(data_set: DataSet,
                 if star_schema:  # Add foreign keys for dates and durations
                     if attribute.type == Type.DATE:
                         custom_column_expression = f"TO_CHAR({quote(table_alias)}.{quote(column_name)}, 'YYYYMMDD') :: INTEGER"
-                        column_alias = name if human_readable_columns else database_identifier(name) + '_fk'
+                        column_alias = (
+                            name
+                            if human_readable_columns
+                            else f'{database_identifier(name)}_fk'
+                        )
                     elif attribute.type == Type.DURATION:
-                        column_alias = name if human_readable_columns else database_identifier(name) + '_fk'
+                        column_alias = (
+                            name
+                            if human_readable_columns
+                            else f'{database_identifier(name)}_fk'
+                        )
                     elif not path:
                         pass  # Add attributes of data set entity
                     else:
@@ -115,13 +135,16 @@ def data_set_sql_query(data_set: DataSet,
                                               cast_to_text=attribute.type == Type.ENUM, first=first,
                                               custom_column_expression=custom_column_expression)
 
-        # Only add foreign key columns of linked entities
-        elif star_schema_transitive_fks is False and path:
+        elif not star_schema_transitive_fks and path:
             first = add_column_definition(
-                table_alias=table_alias_for_path(path[:-1]) if len(path) > 1 else entity_table_alias,
+                table_alias=table_alias_for_path(path[:-1])
+                if len(path) > 1
+                else entity_table_alias,
                 column_name=path[-1].fk_column,
-                column_alias=table_alias_for_path(path) + '_fk',
-                cast_to_text=False, first=first)
+                column_alias=f'{table_alias_for_path(path)}_fk',
+                cast_to_text=False,
+                first=first,
+            )
         else:
             assert False, 'This should not happen.'
 
@@ -129,20 +152,19 @@ def data_set_sql_query(data_set: DataSet,
     # helper function for pre-computing composed metrics
     def sql_formula(metric):
         if isinstance(metric, SimpleMetric):
-            if metric.aggregation in [Aggregation.DISTINCT_COUNT, Aggregation.COUNT]:
-                # for distinct counts, return 1::SMALLINT if the expression is not null
-                return f'({quote(entity_table_alias)}.{quote(metric.column_name)} IS NOT NULL) ::INTEGER :: SMALLINT'
-            else:
-                # Coalesce with 0 so that metrics that combine simplemetrics work ( in SQL `1 + NULL` is `NULL` )
-                return f'COALESCE({quote(entity_table_alias)}.{quote(metric.column_name)}, 0)'
-        else:
-            if '/' in metric.formula_template:  # avoid divisions by 0
-                return metric.formula_template.format(
-                    *[f'(NULLIF({sql_formula(metric)}, 0.0 :: DOUBLE PRECISION))' for metric in metric.parent_metrics])
+            return (
+                f'({quote(entity_table_alias)}.{quote(metric.column_name)} IS NOT NULL) ::INTEGER :: SMALLINT'
+                if metric.aggregation
+                in [Aggregation.DISTINCT_COUNT, Aggregation.COUNT]
+                else f'COALESCE({quote(entity_table_alias)}.{quote(metric.column_name)}, 0)'
+            )
+        if '/' in metric.formula_template:  # avoid divisions by 0
+            return metric.formula_template.format(
+                *[f'(NULLIF({sql_formula(metric)}, 0.0 :: DOUBLE PRECISION))' for metric in metric.parent_metrics])
 
-            else:  # render metric template
-                return metric.formula_template.format(
-                    *[f'({sql_formula(metric)})' for metric in metric.parent_metrics])
+        else:  # render metric template
+            return metric.formula_template.format(
+                *[f'({sql_formula(metric)})' for metric in metric.parent_metrics])
 
     first = True
     for name, metric in data_set.metrics.items():

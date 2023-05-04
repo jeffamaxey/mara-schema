@@ -120,19 +120,37 @@ def data_set_page(id: str) -> response.Response:
                 ]])
             for prefixed_name, attribute in attributes.items():
                 attribute_link_id = slugify(f'attribute {path[-1].target_entity.name if path else ""} {attribute.name}')
-                rows.append(_.tr(id=attribute_link_id)[
-                                _.td[
-                                    escape(prefixed_name),
-                                    ' ',
-                                    _.a(class_='anchor-link-sign',
-                                        href=f'#{attribute_link_id}')['¶'],
-
-                                ],
-                                _.td[[_.i[escape(attribute.description)]] +
-                                     ([' (', _.a(href=attribute.more_url)['more...'], ')']
-                                      if attribute.more_url else [])],
-                                _.td[_.tt[escape(
-                                    f'{path[-1].target_entity.table_name + "." if path else ""}{attribute.column_name}')]]])
+                rows.append(
+                    _.tr(id=attribute_link_id)[
+                        _.td[
+                            escape(prefixed_name),
+                            ' ',
+                            _.a(
+                                class_='anchor-link-sign',
+                                href=f'#{attribute_link_id}',
+                            )['¶'],
+                        ],
+                        _.td[
+                            [_.i[escape(attribute.description)]]
+                            + (
+                                [
+                                    ' (',
+                                    _.a(href=attribute.more_url)['more...'],
+                                    ')',
+                                ]
+                                if attribute.more_url
+                                else []
+                            )
+                        ],
+                        _.td[
+                            _.tt[
+                                escape(
+                                    f'{f"{path[-1].target_entity.table_name}." if path else ""}{attribute.column_name}'
+                                )
+                            ]
+                        ],
+                    ]
+                )
         return rows
 
     def metrics_rows(data_set: DataSet) -> []:
@@ -243,10 +261,11 @@ def data_set_graph(id: str) -> str:
     from .graph import data_set_graph
 
     data_set = next((data_set for data_set in config.data_sets() if data_set.id() == id), None)
-    if not data_set:
-        return f'Could not find data set "{id}"'
-
-    return data_set_graph(data_set)
+    return (
+        data_set_graph(data_set)
+        if data_set
+        else f'Could not find data set "{id}"'
+    )
 
 
 @blueprint.route('/<id>/_metrics_graph')
@@ -257,7 +276,8 @@ def metrics_graph(id: str) -> str:
     from .graph import metrics_graph
 
     data_set = next((data_set for data_set in config.data_sets() if data_set.id() == id), None)
-    if not data_set:
-        return f'Could not find data set "{id}"'
-
-    return metrics_graph(data_set)
+    return (
+        metrics_graph(data_set)
+        if data_set
+        else f'Could not find data set "{id}"'
+    )

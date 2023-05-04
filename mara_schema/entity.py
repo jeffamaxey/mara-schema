@@ -111,14 +111,21 @@ class Entity():
 
     def find_attribute(self, attribute_name: str) -> Attribute:
         """Find an attribute by its name"""
-        attribute = next((attribute for attribute in self.attributes if attribute.name == attribute_name), None)
-        if not attribute:
+        if attribute := next(
+            (
+                attribute
+                for attribute in self.attributes
+                if attribute.name == attribute_name
+            ),
+            None,
+        ):
+            return attribute
+        else:
             raise KeyError(f'Attribute "{attribute_name}" not found in f{self}')
-        return attribute
 
     def connected_entities(self) -> ['Entity']:
         """ Find all recursively linked entities. """
-        result = set([self])
+        result = {self}
 
         def traverse_graph(entity: Entity):
             for link in entity.entity_links:

@@ -49,14 +49,15 @@ class Attribute():
 
         def first_lower(string: str = ''):
             """Lowercase first letter if the first two letter are not capitalized """
-            if not re.match(r'([A-Z]){2}', string):
-                return string[:1].lower() + string[1:]
-            else:
-                return string
+            return (
+                string
+                if re.match(r'([A-Z]){2}', string)
+                else string[:1].lower() + string[1:]
+            )
 
         if path:
             prefix = ' '.join([entity_link.prefix.lower() for entity_link in path])
-            return normalize_name(prefix + ' ' + first_lower(self.name))
+            return normalize_name(f'{prefix} {first_lower(self.name)}')
         else:
             return normalize_name(self.name)
 

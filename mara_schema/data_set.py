@@ -88,15 +88,16 @@ class DataSet():
                 raise ValueError(f'Could not find metric "{metric_name} in data set "{self.name}"')
             parent_metrics.append(self.metrics[metric_name])
 
-        self.metrics[name] = ComposedMetric(name=name,
-                                            description=description,
-                                            data_set=self,
-                                            parent_metrics=parent_metrics,
-                                            formula_template='{}'.join(formula_split[0::2]),
-                                            important_field=important_field,
-                                            number_format=number_format,
-                                            more_url=more_url,
-                                            )
+        self.metrics[name] = ComposedMetric(
+            name=name,
+            description=description,
+            data_set=self,
+            parent_metrics=parent_metrics,
+            formula_template='{}'.join(formula_split[::2]),
+            important_field=important_field,
+            number_format=number_format,
+            more_url=more_url,
+        )
 
     _PathSpec = typing.TypeVar('_PathSpec', typing.Sequence[typing.Union[str, typing.Tuple[str, str]]], bytes)
 
@@ -146,11 +147,14 @@ class DataSet():
         entity_links = self._parse_path(self.entity, path)
         entity = entity_links[-1].target_entity
 
-        if not attribute_names:
-            self.excluded_attributes[entity_links] = entity.attributes
-        else:
-            self.excluded_attributes[entity_links] = [entity.find_attribute(attribute_name) for attribute_name in
-                                                      attribute_names]
+        self.excluded_attributes[entity_links] = (
+            [
+                entity.find_attribute(attribute_name)
+                for attribute_name in attribute_names
+            ]
+            if attribute_names
+            else entity.attributes
+        )
 
     def include_attributes(self, path: _PathSpec, attribute_names: [str]):
         """

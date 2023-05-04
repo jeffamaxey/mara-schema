@@ -8,11 +8,11 @@ def get_long_description():
 
 def static_files() -> [str]:
     module_path = pathlib.Path('mara_schema')
-    files = []
-    for p in module_path.glob('ui/static/**/*'):
-        if p.is_file():
-            files.append(str(p.relative_to(module_path)))
-    return files
+    return [
+        str(p.relative_to(module_path))
+        for p in module_path.glob('ui/static/**/*')
+        if p.is_file()
+    ]
 
 
 setup(
